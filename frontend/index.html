@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insta Reel Downloader - Download Instagram Reels & Videos Free</title>
+    <meta name="description" content="Free Instagram Reel downloader. Download public Instagram Reels and videos in HD quality.">
+    <meta name="keywords" content="instagram reel downloader, download instagram reels, instagram video downloader, save instagram videos">
+    <link rel="stylesheet" href="styles/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <div class="logo-icon">🎬</div>
+                    <div class="logo-text">
+                        <h1>Insta Reel Downloader</h1>
+                        <span class="tagline">Download Reels in One Click</span>
+                    </div>
+                </div>
+                <div class="nav-links">
+                    <a href="#how-it-works" class="nav-link">How to Use</a>
+                    <a href="#features" class="nav-link">Features</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span>🚀 100% Free & Fast</span>
+                    </div>
+                    <h1 class="hero-title">
+                        Download Instagram 
+                        <span class="gradient-text">Reels & Videos</span> 
+                        Instantly
+                    </h1>
+                    <p class="hero-subtitle">Public Reels & Video Posts • HD Quality • No Registration Required</p>
+                    
+                    <!-- Download Form -->
+                    <div class="download-form">
+                        <div class="input-group">
+                            <div class="input-wrapper">
+                                <input type="text" id="videoUrl" placeholder="Paste Instagram Reel URL here..." class="url-input">
+                                <div class="input-icon">🔗</div>
+                            </div>
+                            <button id="downloadBtn" class="download-btn">
+                                <span class="btn-text">
+                                    <span class="btn-icon">⬇️</span>
+                                    Download Now
+                                </span>
+                                <span class="btn-loading" style="display: none;">
+                                    <div class="spinner"></div>
+                                    Processing...
+                                </span>
+                            </button>
+                        </div>
+                        <div class="form-note">
+                            <strong>Example:</strong> https://www.instagram.com/reel/ABC123... or https://www.instagram.com/p/XYZ789...
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="quick-stats">
+                        <div class="stat">
+                            <div class="stat-number">10K+</div>
+                            <div class="stat-label">Downloads</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">99%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">24/7</div>
+                            <div class="stat-label">Available</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-container">
+                    <div class="results-header">
+                        <h2 class="results-title">🎉 Download Ready!</h2>
+                        <p class="results-subtitle">Your Instagram Reel is prepared for download</p>
+                    </div>
+                    <div class="video-preview" id="videoPreview">
+                        <!-- Video preview will be inserted here -->
+                    </div>
+                    <div class="download-options" id="downloadOptions">
+                        <!-- Download buttons will be inserted here -->
+                    </div>
+                    <div class="results-footer">
+                        <button class="new-download-btn" onclick="resetDownload()">
+                            📥 Download Another Reel
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- How It Works -->
+            <section class="how-it-works" id="how-it-works">
+                <div class="section-header">
+                    <h2>How to Download Instagram Reels</h2>
+                    <p>Simple steps to save your favorite reels</p>
+                </div>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-icon">1</div>
+                        <div class="step-content">
+                            <h3>Copy Reel URL</h3>
+                            <p>Open Instagram app, tap share button on the reel, and copy the link</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">2</div>
+                        <div class="step-content">
+                            <h3>Paste URL</h3>
+                            <p>Paste the copied Instagram URL in the input field above</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">3</div>
+                        <div class="step-content">
+                            <h3>Download</h3>
+                            <p>Click download button and save your reel in HD quality</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features -->
+            <section class="features" id="features">
+                <div class="section-header">
+                    <h2>Why Choose Insta Reel Downloader?</h2>
+                    <p>Best features for seamless downloading experience</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Lightning Fast</h3>
+                        <p>Download reels in seconds with our optimized processing</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💯</div>
+                        <h3>100% Free</h3>
+                        <p>No hidden charges, no subscription fees</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>Safe & Secure</h3>
+                        <p>Your privacy is protected, no data storage</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h3>Mobile Optimized</h3>
+                        <p>Works perfectly on all devices and screen sizes</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>No Watermark</h3>
+                        <p>Download original quality videos without any watermark</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3>Easy to Use</h3>
+                        <p>Simple interface, no technical skills required</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Supported Platforms -->
+            <section class="supported-platforms">
+                <div class="section-header">
+                    <h2>Supported Content</h2>
+                    <p>Download public Instagram video content</p>
+                </div>
+                <div class="platforms-grid">
+                    <div class="platform-card">
+                        <div class="platform-icon">🎬</div>
+                        <h4>Instagram Reels</h4>
+                        <p>Download short videos and reels</p>
+                    </div>
+                    <div class="platform-card">
+                        <div class="platform-icon">📹</div>
+                        <h4>IGTV Videos</h4>
+                        <p>Save public video content</p>
+                    </div>
+                    <div class="platform-card">
+                        <div class="platform-icon">📸</div>
+                        <h4>Video Posts</h4>
+                        <p>Download public feed videos</p>
+                    </div>
+                    <div class="platform-card">
+                        <div class="platform-icon">🖼️</div>
+                        <h4>Public Links</h4>
+                        <p>Works without an Instagram login</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQ -->
+            <section class="faq">
+                <div class="section-header">
+                    <h2>Frequently Asked Questions</h2>
+                    <p>Quick answers to common questions</p>
+                </div>
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <h3>Is this service really free?</h3>
+                        <p>Yes, Insta Reel Downloader is completely free to use with no hidden charges.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>Do I need to install any app?</h3>
+                        <p>No, our service works directly in your browser without any installation.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>What quality are the downloads?</h3>
+                        <p>We provide the highest available quality, usually HD or Full HD.</p>
+                    </div>
+                    <div class="faq-item">
+                        <h3>Is it legal to download Instagram reels?</h3>
+                        <p>It's for personal use only. Please respect copyright and Instagram's terms.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <div class="logo-icon">🎬</div>
+                        <div class="logo-text">
+                            <h3>Insta Reel Downloader</h3>
+                            <span class="tagline">Download Reels in One Click</span>
+                        </div>
+                    </div>
+                    <p class="footer-description">
+                        The fastest and easiest way to download Instagram Reels and videos for free.
+                    </p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-section">
+                        <h4>Quick Links</h4>
+                        <a href="#how-it-works">How to Use</a>
+                        <a href="#features">Features</a>
+                        <a href="#faq">FAQ</a>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Support</h4>
+                        <a href="contact.html">Contact Us</a>
+                        <a href="privacy.html">Privacy Policy</a>
+                        <a href="terms.html">Terms of Service</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Insta Reel Downloader. All rights reserved.</p>
+                <p class="disclaimer">
+                    This tool is for personal use only. Please respect copyright and Instagram's Terms of Service.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="scripts/main.js"></script>
+</body>
+</html>
