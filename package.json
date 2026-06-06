@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node backend/server.js",
     "start": "node backend/server.js",
-    "serve:static": "python3 -m http.server 8000 -d frontend"
+    "serve:static": "python3 -m http.server 5500"
   },
   "keywords": ["instagram", "reel", "downloader"],
   "author": "",

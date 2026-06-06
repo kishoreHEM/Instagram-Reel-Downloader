@@ -1,11 +1,17 @@
 const childProcess = require('child_process');
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
-const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
+const PROJECT_DIR = path.join(__dirname, '..');
+const SPLIT_FRONTEND_DIR = path.join(PROJECT_DIR, 'frontend');
+const FRONTEND_DIR = fs.existsSync(path.join(SPLIT_FRONTEND_DIR, 'index.html'))
+    ? SPLIT_FRONTEND_DIR
+    : PROJECT_DIR;
+const USING_FLAT_FRONTEND = FRONTEND_DIR === PROJECT_DIR;
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const RESOLVE_TIMEOUT_MS = 90 * 1000;
 
@@ -20,9 +26,21 @@ const MIME_TYPES = {
 
 function sendJson(res, statusCode, payload) {
     res.writeHead(statusCode, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
         'Content-Type': 'application/json; charset=utf-8'
     });
     res.end(JSON.stringify(payload));
+}
+
+function sendOptions(res) {
+    res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+    });
+    res.end();
 }
 
 function parseInstagramUrl(rawUrl) {
@@ -241,6 +259,7 @@ function handleDownload(req, res, requestUrl) {
         if (!started) {
             started = true;
             res.writeHead(200, {
+                'Access-Control-Allow-Origin': '*',
                 'Content-Disposition': `attachment; filename="${filename}"`,
                 'Content-Type': 'video/mp4'
             });
@@ -280,10 +299,87 @@ function handleDownload(req, res, requestUrl) {
     });
 }
 
+function handleThumbnail(req, res, requestUrl, redirectCount = 0) {
+    let thumbnailUrl;
+
+    try {
+        thumbnailUrl = new URL(requestUrl.searchParams.get('url') || '');
+    } catch (error) {
+        sendJson(res, 422, {
+            success: false,
+            error: 'Invalid thumbnail URL.'
+        });
+        return;
+    }
+
+    if (!['http:', 'https:'].includes(thumbnailUrl.protocol)) {
+        sendJson(res, 422, {
+            success: false,
+            error: 'Invalid thumbnail URL.'
+        });
+        return;
+    }
+
+    const client = thumbnailUrl.protocol === 'https:' ? https : http;
+    const proxyRequest = client.get(thumbnailUrl, {
+        headers: {
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0'
+        },
+        timeout: 15000
+    }, (proxyResponse) => {
+        const contentType = proxyResponse.headers['content-type'] || 'image/jpeg';
+
+        if ([301, 302, 303, 307, 308].includes(proxyResponse.statusCode) && proxyResponse.headers.location && redirectCount < 3) {
+            proxyResponse.resume();
+            requestUrl.searchParams.set('url', new URL(proxyResponse.headers.location, thumbnailUrl).toString());
+            handleThumbnail(req, res, requestUrl, redirectCount + 1);
+            return;
+        }
+
+        if (!String(contentType).startsWith('image/')) {
+            sendJson(res, 422, {
+                success: false,
+                error: 'Thumbnail did not return an image.'
+            });
+            proxyResponse.resume();
+            return;
+        }
+
+        res.writeHead(proxyResponse.statusCode || 200, {
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600',
+            'Content-Type': contentType
+        });
+        proxyResponse.pipe(res);
+    });
+
+    proxyRequest.on('timeout', () => {
+        proxyRequest.destroy(new Error('Thumbnail request timed out.'));
+    });
+
+    proxyRequest.on('error', () => {
+        if (!res.headersSent) {
+            sendJson(res, 422, {
+                success: false,
+                error: 'Could not load thumbnail.'
+            });
+        } else {
+            res.end();
+        }
+    });
+}
+
 function serveStatic(req, res, requestUrl) {
     const requestedPath = requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname;
     const decodedPath = decodeURIComponent(requestedPath);
     const filePath = path.normalize(path.join(FRONTEND_DIR, decodedPath));
+
+    if (USING_FLAT_FRONTEND && !isAllowedFlatFrontendPath(decodedPath)) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+    }
 
     const relativePath = path.relative(FRONTEND_DIR, filePath);
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
@@ -306,8 +402,23 @@ function serveStatic(req, res, requestUrl) {
     });
 }
 
+function isAllowedFlatFrontendPath(requestedPath) {
+    return requestedPath === '/index.html'
+        || requestedPath === '/contact.html'
+        || requestedPath === '/privacy.html'
+        || requestedPath === '/terms.html'
+        || requestedPath.startsWith('/assets/')
+        || requestedPath.startsWith('/scripts/')
+        || requestedPath.startsWith('/styles/');
+}
+
 const server = http.createServer((req, res) => {
     const requestUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
+
+    if (requestUrl.pathname.startsWith('/api/') && req.method === 'OPTIONS') {
+        sendOptions(res);
+        return;
+    }
 
     if (requestUrl.pathname === '/api/resolve') {
         handleResolve(req, res, requestUrl);
@@ -319,7 +430,22 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    if (requestUrl.pathname === '/api/thumbnail') {
+        handleThumbnail(req, res, requestUrl);
+        return;
+    }
+
     serveStatic(req, res, requestUrl);
+});
+
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. The backend may already be running at http://127.0.0.1:${PORT}`);
+        console.error(`Stop the existing process or open http://127.0.0.1:${PORT} directly.`);
+        process.exit(1);
+    }
+
+    throw error;
 });
 
 server.listen(PORT, '127.0.0.1', () => {

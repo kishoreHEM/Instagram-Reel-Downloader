@@ -5,6 +5,7 @@ class InstaReelDownloader {
         this.resultsSection = document.getElementById('resultsSection');
         this.videoPreview = document.getElementById('videoPreview');
         this.downloadOptions = document.getElementById('downloadOptions');
+        this.apiBaseUrl = this.getApiBaseUrl();
         
         this.init();
     }
@@ -40,6 +41,19 @@ class InstaReelDownloader {
             return false;
         }
     }
+
+    getApiBaseUrl() {
+        const localHosts = ['127.0.0.1', 'localhost', '::1'];
+        const isLocalStaticServer = localHosts.includes(window.location.hostname)
+            && window.location.port
+            && window.location.port !== '3000';
+
+        return isLocalStaticServer ? `${window.location.protocol}//${window.location.hostname}:3000` : '';
+    }
+
+    apiUrl(path) {
+        return `${this.apiBaseUrl}${path}`;
+    }
     
     async handleDownload() {
         const url = this.videoUrlInput.value.trim();
@@ -74,7 +88,19 @@ class InstaReelDownloader {
         // Show loading progress
         this.showProgress('Processing reel...', 30);
 
-        const response = await fetch(`/api/resolve?url=${encodeURIComponent(url)}`);
+        let response;
+
+        try {
+            response = await fetch(this.apiUrl(`/api/resolve?url=${encodeURIComponent(url)}`));
+        } catch (error) {
+            throw new Error('Backend server is not running. Run npm start, then open http://127.0.0.1:3000/ or keep the backend running while using Live Server.');
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            throw new Error('The frontend is reaching a static page instead of the backend API. Run npm start and use http://127.0.0.1:3000/, or keep the backend running on port 3000 when using Live Server.');
+        }
+
         const videoData = await response.json();
 
         this.showProgress('Preparing download...', 90);
@@ -115,30 +141,52 @@ class InstaReelDownloader {
 
         const safeTitle = this.escapeHtml(videoData.title || 'Instagram video');
         const safeUploader = this.escapeHtml(videoData.uploader || '');
-        const safeThumbnail = this.escapeAttribute(videoData.thumbnail || '');
+        const thumbnailUrl = videoData.thumbnail
+            ? this.apiUrl(`/api/thumbnail?url=${encodeURIComponent(videoData.thumbnail)}`)
+            : '';
+        const safeThumbnail = this.escapeAttribute(thumbnailUrl);
 
         // Create video preview
         this.videoPreview.innerHTML = `
-            <div class="video-wrapper">
-                ${safeThumbnail ? `<img src="${safeThumbnail}" alt="${safeTitle}" class="video-thumbnail">` : '<div class="video-thumbnail placeholder">Preview unavailable</div>'}
+            <div class="result-card">
+                <div class="video-thumb-shell">
+                    ${safeThumbnail ? `<img src="${safeThumbnail}" alt="${safeTitle}" class="video-thumbnail-img">` : ''}
+                    <div class="video-thumbnail-fallback ${safeThumbnail ? 'is-hidden' : ''}">
+                        <span class="fallback-icon">▶</span>
+                        <span>Preview unavailable</span>
+                    </div>
+                </div>
                 <div class="video-meta">
                     <h3>${safeTitle}</h3>
-                    ${safeUploader ? `<p>${safeUploader}</p>` : ''}
+                    ${safeUploader ? `<p>${safeUploader}</p>` : '<p>Public Instagram video</p>'}
                 </div>
             </div>
         `;
+
+        const thumbnailImg = this.videoPreview.querySelector('.video-thumbnail-img');
+        const thumbnailFallback = this.videoPreview.querySelector('.video-thumbnail-fallback');
+        if (thumbnailImg && thumbnailFallback) {
+            thumbnailImg.addEventListener('load', () => {
+                thumbnailFallback.classList.add('is-hidden');
+            });
+            thumbnailImg.addEventListener('error', () => {
+                thumbnailImg.remove();
+                thumbnailFallback.classList.remove('is-hidden');
+            });
+        }
         
         // Create download buttons
         this.downloadOptions.innerHTML = videoData.formats.map((format) => {
-            const downloadUrl = `/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-video')}`;
+            const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-video')}`);
             const quality = this.escapeHtml(format.quality || 'Best');
             const size = this.escapeHtml(format.size || 'Unknown size');
             const fileFormat = this.escapeHtml(format.format || 'MP4');
+            const qualityClass = this.escapeAttribute(format.quality || 'best').toLowerCase();
 
             return `
             <a href="${downloadUrl}"
-               class="download-option-btn ${format.quality.toLowerCase()}">
-                <span class="download-icon">Download</span>
+               class="download-option-btn ${qualityClass}">
+                <span class="download-icon" aria-hidden="true">↓</span>
                 <span class="download-info">
                     <strong>Download ${quality}</strong>
                     <small>${size} - ${fileFormat}</small>
