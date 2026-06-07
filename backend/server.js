@@ -448,6 +448,7 @@ server.on('error', (error) => {
     throw error;
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Insta Reel Downloader running at http://127.0.0.1:${PORT}`);
+// Listen on '0.0.0.0' so that Railway can route public traffic to the app
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Insta Reel Downloader running on port ${PORT}`);
 });
