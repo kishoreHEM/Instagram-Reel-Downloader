@@ -448,6 +448,20 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 301: redirect legacy .html paths → clean URLs (SEO)
+    const HTML_TO_CLEAN = {
+        '/index.html': '/',
+        '/contact.html': '/contact',
+        '/privacy.html': '/privacy',
+        '/terms.html': '/terms'
+    };
+    const legacyClean = HTML_TO_CLEAN[requestUrl.pathname];
+    if (legacyClean) {
+        res.writeHead(301, { Location: legacyClean });
+        res.end();
+        return;
+    }
+
     // Rewrite clean URLs → .html paths before static serving
     const cleanResolved = resolveCleanPath(requestUrl.pathname);
     if (cleanResolved) {
