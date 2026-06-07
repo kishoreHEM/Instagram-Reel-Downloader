@@ -763,19 +763,21 @@ body {
 .faq-answer {
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.3s ease;
+    /* Clean, hardware-accelerated timing transition */
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .faq-answer.is-open {
-    max-height: 300px;
+    /* Set a max-height value safely larger than any paragraph length */
+    max-height: 500px; 
 }
 
 .faq-answer p {
     font-size: 15px;
     color: var(--text-gray);
     line-height: 1.7;
-    padding: 0 24px 22px;
+    /* Keeps vertical spacing safely bounded inside open transitions */
+    padding: 4px 24px 24px 24px; 
 }
 
 .faq-answer p strong {
