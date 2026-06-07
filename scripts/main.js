@@ -317,3 +317,32 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(el);
     });
 });
+
+// FAQ Accordion
+document.addEventListener('DOMContentLoaded', function () {
+    const accordion = document.getElementById('faqAccordion');
+    if (!accordion) return;
+
+    accordion.addEventListener('click', function (e) {
+        const btn = e.target.closest('.faq-question');
+        if (!btn) return;
+
+        const isOpen = btn.getAttribute('aria-expanded') === 'true';
+        const answerId = btn.getAttribute('aria-controls');
+        const answer = document.getElementById(answerId);
+
+        // Close all other open items
+        accordion.querySelectorAll('.faq-question[aria-expanded="true"]').forEach(openBtn => {
+            if (openBtn !== btn) {
+                openBtn.setAttribute('aria-expanded', 'false');
+                const otherId = openBtn.getAttribute('aria-controls');
+                const otherAnswer = document.getElementById(otherId);
+                if (otherAnswer) otherAnswer.classList.remove('is-open');
+            }
+        });
+
+        // Toggle current item
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        if (answer) answer.classList.toggle('is-open', !isOpen);
+    });
+});

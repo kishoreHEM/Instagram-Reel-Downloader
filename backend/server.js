@@ -402,6 +402,19 @@ function serveStatic(req, res, requestUrl) {
     });
 }
 
+// Clean-URL page map: /privacy → /privacy.html, etc.
+const CLEAN_URL_MAP = {
+    '/': '/index.html',
+    '/contact': '/contact.html',
+    '/privacy': '/privacy.html',
+    '/terms': '/terms.html',
+    '/faq': '/index.html' // FAQ lives as a section on the homepage
+};
+
+function resolveCleanPath(pathname) {
+    return CLEAN_URL_MAP[pathname] || null;
+}
+
 function isAllowedFlatFrontendPath(requestedPath) {
     return requestedPath === '/index.html'
         || requestedPath === '/contact.html'
@@ -433,6 +446,12 @@ const server = http.createServer((req, res) => {
     if (requestUrl.pathname === '/api/thumbnail') {
         handleThumbnail(req, res, requestUrl);
         return;
+    }
+
+    // Rewrite clean URLs → .html paths before static serving
+    const cleanResolved = resolveCleanPath(requestUrl.pathname);
+    if (cleanResolved) {
+        requestUrl.pathname = cleanResolved;
     }
 
     serveStatic(req, res, requestUrl);
