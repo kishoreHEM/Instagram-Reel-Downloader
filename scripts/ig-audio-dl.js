@@ -1,4 +1,4 @@
-class InstaReelDownloader {
+class InstaAudioDownloader {
     constructor() {
         this.videoUrlInput = document.getElementById('videoUrl');
         this.downloadBtn = document.getElementById('downloadBtn');
@@ -18,11 +18,9 @@ class InstaReelDownloader {
             }
         });
         
-        // Clear input on page load for better mobile UX
         this.videoUrlInput.value = '';
         this.videoUrlInput.focus();
         
-        // Add input validation
         this.videoUrlInput.addEventListener('input', () => {
             this.clearError();
         });
@@ -32,8 +30,6 @@ class InstaReelDownloader {
         try {
             const parsed = new URL(url.trim());
             const allowedHosts = ['instagram.com', 'www.instagram.com', 'm.instagram.com'];
-            
-            // FIXED: Loosened regex to cleanly handle tracking and query parameters from mobile shares
             const allowedPath = /^\/(reel|reels|p|tv)\/([A-Za-z0-9_\-]+)/i;
 
             return ['http:', 'https:'].includes(parsed.protocol)
@@ -66,7 +62,7 @@ class InstaReelDownloader {
         }
         
         if (!this.validateInstagramUrl(url)) {
-            this.showError('Please enter a valid public Instagram video URL\n\nSupported formats:\n• https://www.instagram.com/reel/ABC123...\n• https://www.instagram.com/p/XYZ789...\n• https://www.instagram.com/tv/...');
+            this.showError('Please enter a valid public Instagram Reel or video URL\n\nSupported formats:\n• https://www.instagram.com/reel/ABC123...\n• https://www.instagram.com/p/XYZ789...\n• https://www.instagram.com/tv/...');
             return;
         }
         
@@ -75,20 +71,18 @@ class InstaReelDownloader {
         this.clearError();
         
         try {
-            const videoData = await this.processVideo(url);
-            this.showResults(videoData);
-            this.showSuccess('Video ready. Choose a download option below.');
+            const data = await this.processUrl(url);
+            this.displayResults(data);
+            this.showSuccess('Audio extracted! Preview and download below.');
         } catch (error) {
-            this.showError(error.message || 'Failed to process reel. Please check the URL and try again.');
+            this.showError(error.message || 'Failed to extract audio. Please check the URL and try again.');
             console.error('Error:', error);
         } finally {
             this.setLoadingState(false);
         }
     }
     
-    async processVideo(url) {
-        this.showProgress('Processing reel...', 30);
-
+    async processUrl(url) {
         let response;
 
         try {
@@ -102,19 +96,68 @@ class InstaReelDownloader {
             throw new Error('The frontend is reaching a static page instead of the backend API. Run npm start and use http://127.0.0.1:3000/, or keep the backend running on port 3000 when using Live Server.');
         }
 
-        const videoData = await response.json();
+        const data = await response.json();
 
-        this.showProgress('Preparing download...', 90);
-
-        if (!response.ok || !videoData.success) {
-            throw new Error(videoData.error || 'Could not extract this Instagram video.');
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Could not extract audio from this Instagram video.');
         }
 
-        return videoData;
+        return data;
     }
     
-    showProgress(message, percent) {
-        console.log(`${message} (${percent}%)`);
+    displayResults(data) {
+        if (!data.success) {
+            throw new Error(data.error || 'Processing failed');
+        }
+
+        const safeTitle = this.escapeHtml(data.title || 'Instagram Audio');
+        const safeUploader = this.escapeHtml(data.uploader || '');
+
+        // Build the audio download URL - request audio-only format
+        const audioDownloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(data.sourceUrl)}&format_id=${encodeURIComponent('bestaudio[ext=m4a]/bestaudio/best')}&filename=${encodeURIComponent((data.filename || 'instagram-audio').replace(/\.mp4$/i, '.mp3'))}`);
+
+        // Build a proxied audio stream URL for the HTML5 audio preview
+        const audioPreviewUrl = audioDownloadUrl;
+
+        this.videoPreview.innerHTML = `
+            <div class="result-card" style="grid-template-columns: 1fr; text-align: center;">
+                <div class="video-meta" style="text-align: center;">
+                    <h3>${safeTitle}</h3>
+                    ${safeUploader ? `<p>${safeUploader}</p>` : '<p>Public Instagram audio</p>'}
+                </div>
+                <div class="audio-preview-container" style="width: 100%; padding: 16px 0;">
+                    <audio controls preload="none" style="width: 100%; max-width: 480px; border-radius: 12px;">
+                        <source src="${this.escapeAttribute(audioPreviewUrl)}" type="audio/mpeg">
+                        <source src="${this.escapeAttribute(audioPreviewUrl)}" type="audio/mp4">
+                        Your browser does not support audio playback.
+                    </audio>
+                </div>
+            </div>
+        `;
+
+        this.downloadOptions.innerHTML = `
+            <a href="${this.escapeAttribute(audioDownloadUrl)}" class="download-option-btn best" download>
+                <span class="download-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </span>
+                <span class="download-info">
+                    <strong>Download MP3 Audio</strong>
+                    <small>High Quality Audio Track</small>
+                </span>
+            </a>
+        `;
+        
+        this.resultsSection.style.display = 'block';
+        setTimeout(() => {
+            this.resultsSection.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }, 100);
     }
     
     setLoadingState(loading) {
@@ -132,74 +175,6 @@ class InstaReelDownloader {
             this.downloadBtn.disabled = false;
             this.downloadBtn.style.opacity = '1';
         }
-    }
-    
-    showResults(videoData) {
-        if (!videoData.success) {
-            throw new Error(videoData.error || 'Processing failed');
-        }
-
-        const safeTitle = this.escapeHtml(videoData.title || 'Instagram video');
-        const safeUploader = this.escapeHtml(videoData.uploader || '');
-        const thumbnailUrl = videoData.thumbnail
-            ? this.apiUrl(`/api/thumbnail?url=${encodeURIComponent(videoData.thumbnail)}`)
-            : '';
-        const safeThumbnail = this.escapeAttribute(thumbnailUrl);
-
-        this.videoPreview.innerHTML = `
-            <div class="result-card">
-                <div class="video-thumb-shell">
-                    ${safeThumbnail ? `<img src="${safeThumbnail}" alt="${safeTitle}" class="video-thumbnail-img">` : ''}
-                    <div class="video-thumbnail-fallback ${safeThumbnail ? 'is-hidden' : ''}">
-                        <span class="fallback-icon">▶</span>
-                        <span>Preview unavailable</span>
-                    </div>
-                </div>
-                <div class="video-meta">
-                    <h3>${safeTitle}</h3>
-                    ${safeUploader ? `<p>${safeUploader}</p>` : '<p>Public Instagram video</p>'}
-                </div>
-            </div>
-        `;
-
-        const thumbnailImg = this.videoPreview.querySelector('.video-thumbnail-img');
-        const thumbnailFallback = this.videoPreview.querySelector('.video-thumbnail-fallback');
-        if (thumbnailImg && thumbnailFallback) {
-            thumbnailImg.addEventListener('load', () => {
-                thumbnailFallback.classList.add('is-hidden');
-            });
-            thumbnailImg.addEventListener('error', () => {
-                thumbnailImg.remove();
-                thumbnailFallback.classList.remove('is-hidden');
-            });
-        }
-        
-        this.downloadOptions.innerHTML = videoData.formats.map((format) => {
-            const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-video')}`);
-            const quality = this.escapeHtml(format.quality || 'Best');
-            const size = this.escapeHtml(format.size || 'Unknown size');
-            const fileFormat = this.escapeHtml(format.format || 'MP4');
-            const qualityClass = this.escapeAttribute(format.quality || 'best').toLowerCase();
-
-            return `
-            <a href="${downloadUrl}"
-               class="download-option-btn ${qualityClass}">
-                <span class="download-icon" aria-hidden="true">↓</span>
-                <span class="download-info">
-                    <strong>Download ${quality}</strong>
-                    <small>${size} - ${fileFormat}</small>
-                </span>
-            </a>
-        `;
-        }).join('');
-        
-        this.resultsSection.style.display = 'block';
-        setTimeout(() => {
-            this.resultsSection.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start' 
-            });
-        }, 100);
     }
     
     hideResults() {
@@ -263,7 +238,7 @@ class InstaReelDownloader {
 
 // Global function to reset download
 function resetDownload() {
-    const downloader = window.instaReelDownloader;
+    const downloader = window.instaAudioDownloader;
     if (!downloader) return;
     downloader.hideResults();
     downloader.videoUrlInput.value = '';
@@ -275,7 +250,7 @@ function resetDownload() {
 
 // Initialize application core
 document.addEventListener('DOMContentLoaded', () => {
-    window.instaReelDownloader = new InstaReelDownloader();
+    window.instaAudioDownloader = new InstaAudioDownloader();
 });
 
 // Add touch event listeners for better mobile UX
@@ -325,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const answerId = btn.getAttribute('aria-controls');
         const answer = document.getElementById(answerId);
 
-        // Close all other open items gracefully
         accordion.querySelectorAll('.faq-question[aria-expanded="true"]').forEach(openBtn => {
             if (openBtn !== btn) {
                 openBtn.setAttribute('aria-expanded', 'false');
@@ -335,7 +309,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Toggle current item state
         btn.setAttribute('aria-expanded', String(!isOpen));
         if (answer) answer.classList.toggle('is-open', !isOpen);
     });
@@ -354,7 +327,6 @@ document.addEventListener('DOMContentLoaded', function () {
         menuToggle.setAttribute('aria-expanded', String(isActive));
     });
 
-    // Automatically collapse mobile menu when an anchor link is selected
     navLinks.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
             navLinks.classList.remove('is-active');

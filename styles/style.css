@@ -53,10 +53,167 @@ body {
     backdrop-filter: blur(10px);
 }
 
+/* --- Desktop Navigation Base --- */
 .nav-wrapper {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: var(--text-dark);
+    font-weight: 500;
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.nav-link:hover {
+    color: var(--primary-color);
+}
+
+/* Hide the hamburger button on desktop screens */
+.menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 30px;
+    height: 21px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    z-index: 1001;
+}
+
+.hamburger-bar {
+    width: 100%;
+    height: 3px;
+    background-color: var(--text-dark, #333);
+    border-radius: 2px;
+    transition: all 0.3s ease-in-out;
+}
+
+/* --- Mobile Responsive Rules --- */
+@media (max-width: 768px) {
+    /* Center header elements cleanly */
+    .nav-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0px;
+    }
+
+    /* Show the hamburger icon button on mobile screens with strict sizing */
+    .menu-toggle {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        width: 24px;
+        height: 18px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        z-index: 1001;
+    }
+
+    .hamburger-bar {
+        width: 100%;
+        height: 2.5px;
+        background-color: var(--text-dark, #262626);
+        border-radius: 4px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-origin: left center; /* Prevents weird shifting */
+    }
+
+    /* Transform nav-links into a sleek dropdown right below the header bar */
+    .nav-links {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: calc(100% + 16px); /* Forces menu cleanly below the header padding */
+        right: 0;
+        width: 220px; /* Gives it a sleek, compact card width instead of 100% block width */
+        background: var(--bg-white, #ffffff);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        border-radius: var(--radius, 16px);
+        border: 1px solid var(--border-light, #f0f0f0);
+        padding: 16px;
+        gap: 4px;
+        z-index: 999;
+        
+        /* Smooth scale-in transition */
+        transform: translateY(-10px) scale(0.95);
+        transform-origin: top right;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* WHEN ACTIVE: Clean entry alignment */
+    .nav-links.is-active {
+        max-height: 350px;
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0) scale(1);
+    }
+
+    /* Style the dropdown item links for better touch feedback */
+    .nav-link {
+        width: 100%;
+        padding: 12px 16px;
+        border-radius: var(--radius-sm, 12px);
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-dark, #262626);
+        transition: background 0.2s ease;
+    }
+
+    .nav-link:hover {
+        background: var(--bg-light, #fafafa);
+        color: var(--primary-color);
+    }
+
+    /* Perfect Morph Effect: Flawless "X" transformation */
+    .menu-toggle.is-active .hamburger-bar:nth-child(1) {
+        transform: rotate(45deg) translate(1px, -1px);
+    }
+    .menu-toggle.is-active .hamburger-bar:nth-child(2) {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+    .menu-toggle.is-active .hamburger-bar:nth-child(3) {
+        transform: rotate(-45deg) translate(1px, 1px);
+    }
+}
+
+/* Logo Styles */
+.site-logo {
+    font-size: 22px;
+    font-weight: 800;
+    text-transform: lowercase;
+    text-decoration: none;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: flex;
+    align-items: center;
+    height: 48px;
+    transition: var(--transition);
+}
+
+.site-logo:hover {
+    transform: scale(1.02);
 }
 
 .logo {
@@ -85,25 +242,8 @@ body {
 
 .tagline {
     font-size: 12px;
-    color: var(--text-black);
-    font-weight: 500;
-}
-
-.nav-links {
-    display: none;
-    gap: 24px;
-}
-
-.nav-link {
-    text-decoration: none;
     color: var(--text-dark);
     font-weight: 500;
-    font-size: 14px;
-    transition: var(--transition);
-}
-
-.nav-link:hover {
-    color: var(--primary-color);
 }
 
 .logo-link {
@@ -515,7 +655,7 @@ body {
 
 .section-header p {
     font-size: 18px;
-    color: var(--text-black);
+    color: var(--text-dark);
 }
 
 /* How It Works */
@@ -570,7 +710,7 @@ body {
 
 .step-content p {
     font-size: 14px;
-    color: var(--text-black);
+    color: var(--text-dark);
     line-height: 1.5;
 }
 
@@ -600,9 +740,34 @@ body {
     box-shadow: var(--shadow-hover);
 }
 
+/* Flexbox shell container optimized for raw inline SVGs */
 .feature-icon {
-    font-size: 48px;
-    margin-bottom: 20px;
+    width: 48px;
+    height: 48px;
+    background: rgba(224, 64, 95, 0.06);
+    border-radius: 12px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.feature-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--primary-color);
+    fill: none;
+    transition: var(--transition);
+}
+
+/* Interactive hover color transformation rules */
+.feature-card:hover .feature-icon {
+    background: var(--gradient);
+}
+
+.feature-card:hover .feature-icon svg {
+    stroke: var(--bg-white);
 }
 
 .feature-card h3 {
@@ -614,7 +779,7 @@ body {
 
 .feature-card p {
     font-size: 14px;
-    color: var(--text-black);
+    color: var(--text-dark);
     line-height: 1.5;
 }
 
@@ -643,9 +808,34 @@ body {
     box-shadow: var(--shadow-hover);
 }
 
+/* Flexbox shell container optimized for supported platform grid SVGs */
 .platform-icon {
-    font-size: 40px;
-    margin-bottom: 16px;
+    width: 48px;
+    height: 48px;
+    background: rgba(224, 64, 95, 0.06);
+    border-radius: 12px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.platform-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: var(--primary-color);
+    fill: none;
+    transition: var(--transition);
+}
+
+/* Interactive hover color transformation rules */
+.platform-card:hover .platform-icon {
+    background: var(--gradient);
+}
+
+.platform-card:hover .platform-icon svg {
+    stroke: var(--bg-white);
 }
 
 .platform-card h4 {
@@ -657,7 +847,7 @@ body {
 
 .platform-card p {
     font-size: 13px;
-    color: var(--text-black);
+    color: var(--text-dark);
     line-height: 1.4;
 }
 
@@ -763,20 +953,17 @@ body {
 .faq-answer {
     max-height: 0;
     overflow: hidden;
-    /* Clean, hardware-accelerated timing transition */
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .faq-answer.is-open {
-    /* Set a max-height value safely larger than any paragraph length */
     max-height: 500px; 
 }
 
 .faq-answer p {
     font-size: 15px;
-    color: var(--text-gray);
+    color: var(--text-dark);
     line-height: 1.7;
-    /* Keeps vertical spacing safely bounded inside open transitions */
     padding: 4px 24px 24px 24px; 
 }
 
@@ -806,7 +993,7 @@ body {
 
 .footer-description {
     font-size: 14px;
-    color: var(--text-gray);
+    color: var(--text-dark);
     line-height: 1.5;
     margin-top: 12px;
 }
@@ -826,7 +1013,7 @@ body {
 
 .footer-section a {
     display: block;
-    color: var(--text-gray);
+    color: var(--text-dark);
     text-decoration: none;
     font-size: 14px;
     margin-bottom: 8px;
@@ -845,7 +1032,7 @@ body {
 
 .footer-bottom p {
     font-size: 14px;
-    color: var(--text-black);
+    color: var(--text-dark);
     margin-bottom: 8px;
 }
 
@@ -962,10 +1149,6 @@ body {
         padding: 0 20px;
     }
     
-    .nav-links {
-        display: flex;
-    }
-    
     .logo-text h1 {
         font-size: 24px;
     }
@@ -1017,7 +1200,7 @@ body {
     }
     
     .footer-content {
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: 1fr 1fr;
     }
     
     .footer-links {
@@ -1081,7 +1264,7 @@ body {
 /* Touch-friendly improvements */
 @media (max-width: 768px) {
     button, .download-option-btn, .download-btn, .nav-link {
-        min-height: 44px;
+        min-height: 20px;
     }
     
     .url-input {
