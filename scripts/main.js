@@ -33,12 +33,18 @@ class InstaReelDownloader {
             const parsed = new URL(url.trim());
             const allowedHosts = ['instagram.com', 'www.instagram.com', 'm.instagram.com'];
             
-            // FIXED: Loosened regex to cleanly handle tracking and query parameters from mobile shares
-            const allowedPath = /^\/(reel|reels|p|tv)\/([A-Za-z0-9_\-]+)/i;
+            // FIX 1: Expanded regex parameters to seamlessly handle stories, highlights, and profile links
+            const allowedPath = /^\/(reel|reels|p|tv|stories|s)\/([A-Za-z0-9_\-]+)/i;
+            const paths = parsed.pathname.split('/').filter(Boolean);
 
-            return ['http:', 'https:'].includes(parsed.protocol)
-                && allowedHosts.includes(parsed.hostname.toLowerCase())
-                && allowedPath.test(parsed.pathname);
+            if (!['http:', 'https:'].includes(parsed.protocol) || !allowedHosts.includes(parsed.hostname.toLowerCase())) {
+                return false;
+            }
+
+            // Allow general single root strings for automated profile lookups
+            if (paths.length === 1) return true;
+
+            return allowedPath.test(parsed.pathname);
         } catch (error) {
             return false;
         }
@@ -66,7 +72,7 @@ class InstaReelDownloader {
         }
         
         if (!this.validateInstagramUrl(url)) {
-            this.showError('Please enter a valid public Instagram video URL\n\nSupported formats:\n• https://www.instagram.com/reel/ABC123...\n• https://www.instagram.com/p/XYZ789...\n• https://www.instagram.com/tv/...');
+            this.showError('Please enter a valid public Instagram link\n\nSupported formats:\n• Reels & Videos\n• Photos & Carousels\n• Stories & Highlights');
             return;
         }
         
@@ -77,9 +83,9 @@ class InstaReelDownloader {
         try {
             const videoData = await this.processVideo(url);
             this.showResults(videoData);
-            this.showSuccess('Video ready. Choose a download option below.');
+            this.showSuccess('Media resolved successfully. Choose a download option below.');
         } catch (error) {
-            this.showError(error.message || 'Failed to process reel. Please check the URL and try again.');
+            this.showError(error.message || 'Failed to process link. Ensure the content is public and try again.');
             console.error('Error:', error);
         } finally {
             this.setLoadingState(false);
@@ -87,27 +93,27 @@ class InstaReelDownloader {
     }
     
     async processVideo(url) {
-        this.showProgress('Processing reel...', 30);
+        this.showProgress('Processing link...', 30);
 
         let response;
 
         try {
             response = await fetch(this.apiUrl(`/api/resolve?url=${encodeURIComponent(url)}`));
         } catch (error) {
-            throw new Error('Backend server is not running. Run npm start, then open http://127.0.0.1:3000/ or keep the backend running while using Live Server.');
+            throw new Error('Backend server is not running. Verify your server script instance is live.');
         }
 
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-            throw new Error('The frontend is reaching a static page instead of the backend API. Run npm start and use http://127.0.0.1:3000/, or keep the backend running on port 3000 when using Live Server.');
+            throw new Error('Frontend structural route mismatch. Reaching static asset instead of API context endpoints.');
         }
 
         const videoData = await response.json();
 
-        this.showProgress('Preparing download...', 90);
+        this.showProgress('Preparing download elements...', 90);
 
         if (!response.ok || !videoData.success) {
-            throw new Error(videoData.error || 'Could not extract this Instagram video.');
+            throw new Error(videoData.error || 'Could not extract media assets from this address.');
         }
 
         return videoData;
@@ -122,13 +128,13 @@ class InstaReelDownloader {
         const btnLoading = this.downloadBtn.querySelector('.btn-loading');
         
         if (loading) {
-            btnText.style.display = 'none';
-            btnLoading.style.display = 'flex';
+            if (btnText) btnText.style.display = 'none';
+            if (btnLoading) btnLoading.style.display = 'flex';
             this.downloadBtn.disabled = true;
             this.downloadBtn.style.opacity = '0.8';
         } else {
-            btnText.style.display = 'flex';
-            btnLoading.style.display = 'none';
+            if (btnText) btnText.style.display = 'flex';
+            if (btnLoading) btnLoading.style.display = 'none';
             this.downloadBtn.disabled = false;
             this.downloadBtn.style.opacity = '1';
         }
@@ -139,12 +145,14 @@ class InstaReelDownloader {
             throw new Error(videoData.error || 'Processing failed');
         }
 
-        const safeTitle = this.escapeHtml(videoData.title || 'Instagram video');
+        const safeTitle = this.escapeHtml(videoData.title || 'Instagram content');
         const safeUploader = this.escapeHtml(videoData.uploader || '');
-        const thumbnailUrl = videoData.thumbnail
+        
+        // Setup initial metadata preview display card
+        const singleThumbnail = videoData.thumbnail 
             ? this.apiUrl(`/api/thumbnail?url=${encodeURIComponent(videoData.thumbnail)}`)
             : '';
-        const safeThumbnail = this.escapeAttribute(thumbnailUrl);
+        const safeThumbnail = this.escapeAttribute(singleThumbnail);
 
         this.videoPreview.innerHTML = `
             <div class="result-card">
@@ -152,48 +160,84 @@ class InstaReelDownloader {
                     ${safeThumbnail ? `<img src="${safeThumbnail}" alt="${safeTitle}" class="video-thumbnail-img">` : ''}
                     <div class="video-thumbnail-fallback ${safeThumbnail ? 'is-hidden' : ''}">
                         <span class="fallback-icon">▶</span>
-                        <span>Preview unavailable</span>
+                        <span>Preview ready</span>
                     </div>
                 </div>
                 <div class="video-meta">
                     <h3>${safeTitle}</h3>
-                    ${safeUploader ? `<p>${safeUploader}</p>` : '<p>Public Instagram video</p>'}
+                    <p>${safeUploader ? safeUploader : 'Public Instagram Asset'}</p>
                 </div>
             </div>
         `;
 
+        // Manage preview load fallbacks gracefully
         const thumbnailImg = this.videoPreview.querySelector('.video-thumbnail-img');
         const thumbnailFallback = this.videoPreview.querySelector('.video-thumbnail-fallback');
         if (thumbnailImg && thumbnailFallback) {
-            thumbnailImg.addEventListener('load', () => {
-                thumbnailFallback.classList.add('is-hidden');
-            });
+            thumbnailImg.addEventListener('load', () => thumbnailFallback.classList.add('is-hidden'));
             thumbnailImg.addEventListener('error', () => {
                 thumbnailImg.remove();
                 thumbnailFallback.classList.remove('is-hidden');
             });
         }
         
-        this.downloadOptions.innerHTML = videoData.formats.map((format) => {
-            const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-video')}`);
-            const quality = this.escapeHtml(format.quality || 'Best');
-            const size = this.escapeHtml(format.size || 'Unknown size');
-            const fileFormat = this.escapeHtml(format.format || 'MP4');
-            const qualityClass = this.escapeAttribute(format.quality || 'best').toLowerCase();
+        // FIX 2: Dynamic Format Router Block handling single item streams or complex Carousel layout packs cleanly
+        let optionsHtml = '';
 
-            return `
-            <a href="${downloadUrl}"
-               class="download-option-btn ${qualityClass}">
-                <span class="download-icon" aria-hidden="true">↓</span>
-                <span class="download-info">
-                    <strong>Download ${quality}</strong>
-                    <small>${size} - ${fileFormat}</small>
-                </span>
-            </a>
-        `;
-        }).join('');
-        
+        if (videoData.entries && videoData.entries.length > 0) {
+            // Handle Album Carousel Collections
+            optionsHtml = `<div class="carousel-downloads-grid">`;
+            videoData.entries.forEach((entry, index) => {
+                const format = entry.formats[0] || { quality: 'HQ Asset', size: 'Source', format: 'FILE', formatId: 'best' };
+                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(entry.filename || `file_${index + 1}`)}&type=video`);
+                
+                optionsHtml += `
+                    <a href="${downloadUrl}" class="download-option-btn item-index-${index}">
+                        <span class="download-icon" aria-hidden="true">↓</span>
+                        <span class="download-info">
+                            <strong>Download Part ${index + 1}</strong>
+                            <small>${this.escapeHtml(format.quality)} (${this.escapeHtml(format.size)})</small>
+                        </span>
+                    </a>
+                `;
+            });
+            optionsHtml += `</div>`;
+        } else if (videoData.formats && videoData.formats.length > 0) {
+            // Handle Single Reels, Photos, or Audio Post streams
+            optionsHtml = videoData.formats.map((format) => {
+                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-download')}&type=video`);
+                const quality = this.escapeHtml(format.quality || 'Download');
+                const size = this.escapeHtml(format.size || 'Source file');
+                const fileFormat = this.escapeHtml(format.format || 'Media');
+                const qualityClass = this.escapeAttribute(format.quality || 'best').toLowerCase().replace(/\s+/g, '-');
+
+                return `
+                    <a href="${downloadUrl}" class="download-option-btn ${qualityClass}">
+                        <span class="download-icon" aria-hidden="true">↓</span>
+                        <span class="download-info">
+                            <strong>Download ${quality}</strong>
+                            <small>${size} - ${fileFormat}</small>
+                        </span>
+                    </a>
+                `;
+            }).join('');
+        } else {
+            // Ultimate fallback safety link route if array data configurations are warped
+            const directUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=best&filename=download&type=video`);
+            optionsHtml = `
+                <a href="${directUrl}" class="download-option-btn best">
+                    <span class="download-icon" aria-hidden="true">↓</span>
+                    <span class="download-info">
+                        <strong>Download Media Asset</strong>
+                        <small>Direct Server Download</small>
+                    </span>
+                </a>
+            `;
+        }
+
+        this.downloadOptions.innerHTML = optionsHtml;
         this.resultsSection.style.display = 'block';
+        
         setTimeout(() => {
             this.resultsSection.scrollIntoView({ 
                 behavior: 'smooth', 
@@ -215,7 +259,9 @@ class InstaReelDownloader {
         errorDiv.style.whiteSpace = 'pre-line';
         
         const downloadForm = document.querySelector('.download-form');
-        downloadForm.parentNode.insertBefore(errorDiv, downloadForm.nextSibling);
+        if (downloadForm) {
+            downloadForm.parentNode.insertBefore(errorDiv, downloadForm.nextSibling);
+        }
         
         setTimeout(() => {
             if (errorDiv.parentNode) {
@@ -230,7 +276,9 @@ class InstaReelDownloader {
         successDiv.textContent = message;
         
         const downloadForm = document.querySelector('.download-form');
-        downloadForm.parentNode.insertBefore(successDiv, downloadForm.nextSibling);
+        if (downloadForm) {
+            downloadForm.parentNode.insertBefore(successDiv, downloadForm.nextSibling);
+        }
         
         setTimeout(() => {
             if (successDiv.parentNode) {
@@ -325,7 +373,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const answerId = btn.getAttribute('aria-controls');
         const answer = document.getElementById(answerId);
 
-        // Close all other open items gracefully
         accordion.querySelectorAll('.faq-question[aria-expanded="true"]').forEach(openBtn => {
             if (openBtn !== btn) {
                 openBtn.setAttribute('aria-expanded', 'false');
@@ -335,7 +382,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Toggle current item state
         btn.setAttribute('aria-expanded', String(!isOpen));
         if (answer) answer.classList.toggle('is-open', !isOpen);
     });
@@ -354,7 +400,6 @@ document.addEventListener('DOMContentLoaded', function () {
         menuToggle.setAttribute('aria-expanded', String(isActive));
     });
 
-    // Automatically collapse mobile menu when an anchor link is selected
     navLinks.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
             navLinks.classList.remove('is-active');

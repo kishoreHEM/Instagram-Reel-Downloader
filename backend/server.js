@@ -421,11 +421,13 @@ function handleDownload(req, res, requestUrl) {
 
     let formatId = requestUrl.searchParams.get('format_id') || 'best';
     const requestedFilename = requestUrl.searchParams.get('filename') || 'instagram-download';
-    
+    // Use explicit 'type' param as the single source of truth — never guess from formatId strings
+    const mediaType = requestUrl.searchParams.get('type') || 'video';
+    const isAudio = mediaType === 'audio';
+
     // Evaluate downstream file type signatures
     let contentType = 'video/mp4';
     let filename = requestedFilename;
-    const isAudio = requestedFilename.toLowerCase().endsWith('.mp3') || formatId.includes('audio');
 
     if (isAudio) {
         contentType = 'audio/mpeg';
@@ -444,83 +446,165 @@ function handleDownload(req, res, requestUrl) {
         return;
     }
 
-    const args = [
-        '--no-playlist',
-        '--no-warnings'
-    ];
-
+    // ── AUDIO: stream directly to stdout (MP3 doesn't need seekable output) ──
     if (isAudio) {
-        args.push(
+        const audioArgs = [
+            '--no-playlist',
+            '--no-warnings',
             '-f', 'ba[ext=m4a]/bestaudio/best',
             '--extract-audio',
             '--audio-format', 'mp3',
-            '--audio-quality', '0'
-        );
-    } else {
-        if (formatId === 'best' || formatId === 'best[ext=mp4]/best') {
-            formatId = 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best';
-        }
-        args.push('-f', formatId);
+            '--audio-quality', '0',
+            '-o', '-',
+            instagramUrl
+        ];
+
+        const ytdlp = childProcess.spawn('yt-dlp', audioArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+        let stderr = '';
+        let started = false;
+        let responseClosed = false;
+        const timer = setTimeout(() => { ytdlp.kill('SIGKILL'); }, DOWNLOAD_TIMEOUT_MS);
+
+        res.on('close', () => {
+            if (!res.writableEnded) { responseClosed = true; ytdlp.kill('SIGTERM'); }
+        });
+        ytdlp.stdout.on('data', (chunk) => {
+            if (!started) {
+                started = true;
+                res.writeHead(200, {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Disposition': `attachment; filename="${safeFilename}"`,
+                    'Content-Type': contentType
+                });
+            }
+            res.write(chunk);
+        });
+        ytdlp.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
+        ytdlp.on('error', (error) => {
+            clearTimeout(timer);
+            if (!started && !responseClosed) sendJson(res, 500, { success: false, error: error.message });
+        });
+        ytdlp.on('close', (code) => {
+            clearTimeout(timer);
+            if (responseClosed) return;
+            if (!started) {
+                sendJson(res, code === 0 ? 200 : 422, {
+                    success: code === 0,
+                    error: code === 0 ? undefined : cleanYtDlpError(stderr)
+                });
+                return;
+            }
+            res.end();
+        });
+        return;
     }
 
-    args.push('-o', '-', instagramUrl);
+    // ── VIDEO/IMAGE: write to temp dir first, then stream back ───────────────
+    // MP4 muxing (merging separate video+audio DASH tracks via ffmpeg) requires
+    // seekable output. Piping to stdout produces a corrupt moov atom that
+    // QuickTime and most players reject. We write to a unique temp directory so
+    // ffmpeg can finalise the container, then scan for the output file (yt-dlp
+    // can silently change the extension, e.g. .mp4 → .mkv when muxing).
+    const os = require('os');
+    const tmpDir = path.join(os.tmpdir(), `igdl_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
-    const ytdlp = childProcess.spawn('yt-dlp', args, {
-        stdio: ['ignore', 'pipe', 'pipe']
-    });
+    function cleanupTmpDir() {
+        fs.rm(tmpDir, { recursive: true, force: true }, () => {});
+    }
 
-    let stderr = '';
-    let started = false;
-    let responseClosed = false;
+    if (formatId === 'best' || formatId === 'best[ext=mp4]/best') {
+        formatId = 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best';
+    }
 
-    const timer = setTimeout(() => {
-        ytdlp.kill('SIGKILL');
-    }, DOWNLOAD_TIMEOUT_MS);
-
-    res.on('close', () => {
-        if (!res.writableEnded) {
-            responseClosed = true;
-            ytdlp.kill('SIGTERM');
-        }
-    });
-
-    ytdlp.stdout.on('data', (chunk) => {
-        if (!started) {
-            started = true;
-            res.writeHead(200, {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Disposition': `attachment; filename="${safeFilename}"`,
-                'Content-Type': contentType
-            });
-        }
-        res.write(chunk);
-    });
-
-    ytdlp.stderr.on('data', (chunk) => {
-        stderr += chunk.toString('utf8');
-    });
-
-    ytdlp.on('error', (error) => {
-        clearTimeout(timer);
-        if (!started && !responseClosed) {
-            sendJson(res, 500, { success: false, error: error.message });
-        }
-    });
-
-    ytdlp.on('close', (code) => {
-        clearTimeout(timer);
-        if (responseClosed) return;
-
-        if (!started) {
-            sendJson(res, code === 0 ? 200 : 422, {
-                success: code === 0,
-                error: code === 0 ? undefined : cleanYtDlpError(stderr)
-            });
+    fs.mkdir(tmpDir, { recursive: true }, (mkdirErr) => {
+        if (mkdirErr) {
+            sendJson(res, 500, { success: false, error: 'Could not create temp directory.' });
             return;
         }
-        res.end();
-    });
+
+        const videoArgs = [
+            '--no-playlist',
+            '--no-warnings',
+            '-f', formatId,
+            '--merge-output-format', 'mp4',
+            '-o', path.join(tmpDir, 'video.%(ext)s'),
+            instagramUrl
+        ];
+
+        const ytdlp = childProcess.spawn('yt-dlp', videoArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+        let stderr = '';
+        let responseClosed = false;
+        const timer = setTimeout(() => {
+            ytdlp.kill('SIGKILL');
+            cleanupTmpDir();
+        }, DOWNLOAD_TIMEOUT_MS);
+
+        res.on('close', () => {
+            if (!res.writableEnded) {
+                responseClosed = true;
+                ytdlp.kill('SIGTERM');
+                cleanupTmpDir();
+            }
+        });
+
+        ytdlp.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
+
+        ytdlp.on('error', (error) => {
+            clearTimeout(timer);
+            cleanupTmpDir();
+            if (!responseClosed) sendJson(res, 500, { success: false, error: error.message });
+        });
+
+        ytdlp.on('close', (code) => {
+            clearTimeout(timer);
+            if (responseClosed) return;
+
+            if (code !== 0) {
+                cleanupTmpDir();
+                sendJson(res, 422, { success: false, error: cleanYtDlpError(stderr) });
+                return;
+            }
+
+            // Scan the temp dir for whatever file yt-dlp created
+            fs.readdir(tmpDir, (rdErr, files) => {
+                if (rdErr || !files || files.length === 0) {
+                    cleanupTmpDir();
+                    sendJson(res, 500, { success: false, error: 'Downloaded file not found after processing.' });
+                    return;
+                }
+
+                // Prefer .mp4, otherwise take the first file found
+                const picked = files.find(f => f.endsWith('.mp4')) || files[0];
+                const outFile = path.join(tmpDir, picked);
+
+                fs.stat(outFile, (statErr, stat) => {
+                    if (statErr) {
+                        cleanupTmpDir();
+                        sendJson(res, 500, { success: false, error: 'Failed to read downloaded file.' });
+                        return;
+                    }
+
+                    res.writeHead(200, {
+                        'Access-Control-Allow-Origin': '*',
+                        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+                        'Content-Type': contentType,
+                        'Content-Length': stat.size
+                    });
+
+                    const fileStream = fs.createReadStream(outFile);
+                    fileStream.pipe(res);
+                    fileStream.on('close', () => cleanupTmpDir());
+                    fileStream.on('error', () => {
+                        cleanupTmpDir();
+                        if (!res.headersSent) sendJson(res, 500, { success: false, error: 'Stream error.' });
+                        else res.end();
+                    });
+                });
+            });
+        });
+    }); // end fs.mkdir
 }
+
 
 function handleThumbnail(req, res, requestUrl, redirectCount = 0) {
     let thumbnailUrl;

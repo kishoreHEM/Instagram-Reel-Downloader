@@ -114,7 +114,7 @@ class InstaAudioDownloader {
         const safeUploader = this.escapeHtml(data.uploader || '');
 
         // Build the audio download URL - request audio-only format
-        const audioDownloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(data.sourceUrl)}&format_id=${encodeURIComponent('bestaudio[ext=m4a]/bestaudio/best')}&filename=${encodeURIComponent((data.filename || 'instagram-audio').replace(/\.mp4$/i, '.mp3'))}`);
+        const audioDownloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(data.sourceUrl)}&format_id=${encodeURIComponent('bestaudio[ext=m4a]/bestaudio/best')}&filename=${encodeURIComponent((data.filename || 'instagram-audio').replace(/\.mp4$/i, '.mp3'))}&type=audio`);
 
         // Build a proxied audio stream URL for the HTML5 audio preview
         const audioPreviewUrl = audioDownloadUrl;
