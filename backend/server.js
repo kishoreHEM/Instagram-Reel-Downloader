@@ -186,7 +186,7 @@ function buildUnifiedMediaData(info, sourceUrl) {
                     quality: isVideo ? 'Video HD' : 'Photo HQ',
                     format: ext.toUpperCase(),
                     size: formatBytes(entry.filesize || entry.filesize_approx),
-                    formatId: entry.format_id || 'best'
+                    formatId: isVideo ? 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best' : (entry.format_id || 'best')
                 }]
             };
         });
@@ -214,7 +214,7 @@ function buildUnifiedMediaData(info, sourceUrl) {
             quality: label,
             format: defaultExt.toUpperCase(),
             size: formatBytes(info.filesize || info.filesize_approx),
-            formatId: info.format_id || 'best'
+            formatId: (!isAudioOnly && !isImageOnly) ? 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best' : (info.format_id || 'best')
         }
     ];
 
@@ -419,14 +419,15 @@ function handleDownload(req, res, requestUrl) {
         return;
     }
 
-    const formatId = requestUrl.searchParams.get('format_id') || 'best';
+    let formatId = requestUrl.searchParams.get('format_id') || 'best';
     const requestedFilename = requestUrl.searchParams.get('filename') || 'instagram-download';
     
     // Evaluate downstream file type signatures
     let contentType = 'video/mp4';
     let filename = requestedFilename;
+    const isAudio = requestedFilename.toLowerCase().endsWith('.mp3') || formatId.includes('audio');
 
-    if (requestedFilename.toLowerCase().endsWith('.mp3') || formatId.includes('audio')) {
+    if (isAudio) {
         contentType = 'audio/mpeg';
         if (!filename.toLowerCase().endsWith('.mp3')) filename += '.mp3';
     } else if (requestedFilename.toLowerCase().endsWith('.jpg') || requestedFilename.toLowerCase().endsWith('.jpeg')) {
@@ -443,15 +444,28 @@ function handleDownload(req, res, requestUrl) {
         return;
     }
 
-    const ytdlp = childProcess.spawn('yt-dlp', [
+    const args = [
         '--no-playlist',
-        '--no-warnings',
-        '-f',
-        formatId,
-        '-o',
-        '-',
-        instagramUrl
-    ], {
+        '--no-warnings'
+    ];
+
+    if (isAudio) {
+        args.push(
+            '-f', 'ba[ext=m4a]/bestaudio/best',
+            '--extract-audio',
+            '--audio-format', 'mp3',
+            '--audio-quality', '0'
+        );
+    } else {
+        if (formatId === 'best' || formatId === 'best[ext=mp4]/best') {
+            formatId = 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best';
+        }
+        args.push('-f', formatId);
+    }
+
+    args.push('-o', '-', instagramUrl);
+
+    const ytdlp = childProcess.spawn('yt-dlp', args, {
         stdio: ['ignore', 'pipe', 'pipe']
     });
 
