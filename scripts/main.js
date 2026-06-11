@@ -33,7 +33,7 @@ class InstaReelDownloader {
             const parsed = new URL(url.trim());
             const allowedHosts = ['instagram.com', 'www.instagram.com', 'm.instagram.com'];
             
-            // FIX 1: Expanded regex parameters to seamlessly handle stories, highlights, and profile links
+            // Handle stories, highlights, reels, standard posts, and IG TV paths seamlessly
             const allowedPath = /^\/(reel|reels|p|tv|stories|s)\/([A-Za-z0-9_\-]+)/i;
             const paths = parsed.pathname.split('/').filter(Boolean);
 
@@ -181,7 +181,10 @@ class InstaReelDownloader {
             });
         }
         
-        // FIX 2: Dynamic Format Router Block handling single item streams or complex Carousel layout packs cleanly
+        // UPDATED: Dynamic Context Evaluator checking location pathing parameters
+        const currentPath = window.location.pathname;
+        const pageTypeParam = currentPath.includes('ig-audio-dl') ? 'audio' : 'video';
+
         let optionsHtml = '';
 
         if (videoData.entries && videoData.entries.length > 0) {
@@ -189,7 +192,7 @@ class InstaReelDownloader {
             optionsHtml = `<div class="carousel-downloads-grid">`;
             videoData.entries.forEach((entry, index) => {
                 const format = entry.formats[0] || { quality: 'HQ Asset', size: 'Source', format: 'FILE', formatId: 'best' };
-                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(entry.filename || `file_${index + 1}`)}&type=video`);
+                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(entry.filename || `file_${index + 1}`)}&type=${pageTypeParam}`);
                 
                 optionsHtml += `
                     <a href="${downloadUrl}" class="download-option-btn item-index-${index}">
@@ -205,7 +208,7 @@ class InstaReelDownloader {
         } else if (videoData.formats && videoData.formats.length > 0) {
             // Handle Single Reels, Photos, or Audio Post streams
             optionsHtml = videoData.formats.map((format) => {
-                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-download')}&type=video`);
+                const downloadUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=${encodeURIComponent(format.formatId)}&filename=${encodeURIComponent(videoData.filename || 'instagram-download')}&type=${pageTypeParam}`);
                 const quality = this.escapeHtml(format.quality || 'Download');
                 const size = this.escapeHtml(format.size || 'Source file');
                 const fileFormat = this.escapeHtml(format.format || 'Media');
@@ -223,7 +226,7 @@ class InstaReelDownloader {
             }).join('');
         } else {
             // Ultimate fallback safety link route if array data configurations are warped
-            const directUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=best&filename=download&type=video`);
+            const directUrl = this.apiUrl(`/api/download?url=${encodeURIComponent(videoData.sourceUrl)}&format_id=best&filename=download&type=${pageTypeParam}`);
             optionsHtml = `
                 <a href="${directUrl}" class="download-option-btn best">
                     <span class="download-icon" aria-hidden="true">↓</span>

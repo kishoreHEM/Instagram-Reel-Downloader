@@ -186,7 +186,9 @@ function buildUnifiedMediaData(info, sourceUrl) {
                     quality: isVideo ? 'Video HD' : 'Photo HQ',
                     format: ext.toUpperCase(),
                     size: formatBytes(entry.filesize || entry.filesize_approx),
-                    formatId: isVideo ? 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best' : (entry.format_id || 'best')
+                    formatId: isVideo
+    ? 'bv*[vcodec^=avc1]+ba[ext=m4a]/bestvideo[vcodec^=avc1]+bestaudio/best[vcodec^=avc1]/mp4/best'
+    : (entry.format_id || 'best')
                 }]
             };
         });
@@ -214,7 +216,9 @@ function buildUnifiedMediaData(info, sourceUrl) {
             quality: label,
             format: defaultExt.toUpperCase(),
             size: formatBytes(info.filesize || info.filesize_approx),
-            formatId: (!isAudioOnly && !isImageOnly) ? 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best' : (info.format_id || 'best')
+            formatId: (!isAudioOnly && !isImageOnly)
+    ? 'bv*[vcodec^=avc1]+ba[ext=m4a]/bestvideo[vcodec^=avc1]+bestaudio/best[vcodec^=avc1]/mp4/best'
+    : (info.format_id || 'best')
         }
     ];
 
@@ -513,8 +517,8 @@ function handleDownload(req, res, requestUrl) {
     }
 
     if (formatId === 'best' || formatId === 'best[ext=mp4]/best') {
-        formatId = 'bv*[ext=mp4]+ba[ext=m4a]/bestvideo+bestaudio/best';
-    }
+    formatId = 'bv*[vcodec^=avc1]+ba[ext=m4a]/bestvideo[vcodec^=avc1]+bestaudio/best[vcodec^=avc1]/mp4/best';
+}
 
     fs.mkdir(tmpDir, { recursive: true }, (mkdirErr) => {
         if (mkdirErr) {
